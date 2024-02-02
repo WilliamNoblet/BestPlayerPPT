@@ -3,6 +3,22 @@
 
 CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'International', CompetitionName = 'FIFA World Cup', SeasonName = '2022'){ 
   
+  #Packages
+  if (!require("png")) install.packages("png")
+  library(png)
+  if (!require("plotly")) install.packages("plotly")
+  library(plotly)
+  if (!require("dplyr")) install.packages("dplyr")
+  library(dplyr)
+  if (!require("htmlwidgets")) install.packages("htmlwidgets")
+  library(htmlwidgets)
+  if (!require("webshot")) install.packages("webshot")
+  library(webshot)
+  if (!require("StatsBombR")) install.packages("StatsBombR")
+  library(StatsBombR)
+  if (!require("officer")) install.packages("officer")
+  library(officer)
+  
   TeamMatches <- Matches %>%
     dplyr::filter(home_team.home_team_name == Team| 
                     away_team.away_team_name == Team) %>%
@@ -10,7 +26,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   
   TeamMatchesNumber <- nrow(TeamMatches)
   
-  IndexTeamMatches <- data.frame(index = as.factor(1:TeamMatchesNumber))
+  IndexTeamMatches <- data.frame(index_match = (1:TeamMatchesNumber))
   
   TeamMatches <- TeamMatches %>%
     bind_cols(IndexTeamMatches) %>%
@@ -20,29 +36,36 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
     separate(match_date_2, c('y', 'm', 'd'), sep = '-') %>%
     separate(kick_off_2, c('heure', 'minute', 'seconde', sep = '-'))
   
-  Stadium <- test %>%
-    dplyr::filter(index == Round) %>% dplyr::select(stadium.name)
+  Stadium <- TeamMatches %>%
+    dplyr::filter(index_match == Round) %>% dplyr::select(stadium.name)
   
-  Date <- test %>%
-    dplyr::filter(index == Round) %>% dplyr::select(new_date) 
+  Date <- TeamMatches %>%
+    dplyr::filter(index_match == Round) %>% dplyr::select(new_date) 
   
-  Hour <- test %>%
-    dplyr::filter(index == Round) %>% dplyr::select(heure)
+  Hour <- TeamMatches %>%
+    dplyr::filter(index_match == Round) %>% dplyr::select(heure)
   
-  Minute <- test %>%
-    dplyr::filter(index == Round) %>% dplyr::select(minute)
+  Minute <- TeamMatches %>%
+    dplyr::filter(index_match == Round) %>% dplyr::select(minute)
   
-  D <- test %>%
-    dplyr::filter(index == Round) %>% dplyr::select(d)
+  D <- TeamMatches %>%
+    dplyr::filter(index_match == Round) %>% dplyr::select(d)
   
-  M <- test %>%
-    dplyr::filter(index == Round) %>% dplyr::select(m)
+  M <- TeamMatches %>%
+    dplyr::filter(index_match == Round) %>% dplyr::select(m)
   
-  Y <- test %>%
-    dplyr::filter(index == Round) %>% dplyr::select(y)
+  Y <- TeamMatches %>%
+    dplyr::filter(index_match == Round) %>% dplyr::select(y)
+  
+  Stage <- TeamMatches %>% 
+    dplyr::filter(index_match == Round) %>% dplyr::select(competition_stage.name)
+  
+  IndexMatches <- TeamMatches %>%
+    select(match_id, index_match)
   
   ShotTeam <- StatsBombData %>%
     dplyr::filter(team.name == Team) %>%
+    dplyr::left_join(IndexMatches, by = 'match_id') %>%
     dplyr::filter(type.name == 'Shot') %>%
     dplyr::filter(shot.type.name != 'Penalty' | is.na(shot.type.name)) %>%
     dplyr::filter(location.x >= 90) %>%
@@ -50,6 +73,9 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
     dplyr::mutate(formes = '') %>%
     dplyr::mutate(color = ifelse(shot.outcome.name == 'Goal', '#109618', '#dc3912')) %>%
     dplyr::mutate(formes = ifelse(shot.body_part.name == 'Head', 'circle', 'hexagon'))
+  
+  ShotTeam <- ShotTeam %>%
+    dplyr::filter(index_match < Round)
   
   for(i in seq(from = 1, to = length(ShotTeam$id))){
     if
@@ -76,7 +102,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   
   player_2 = paste0(BestPlayer[2, 1])
   
-  plyaer_3 = paste0(BestPlayer[3, 1])
+  player_3 = paste0(BestPlayer[3, 1])
   
   ShotPlayer1 <- ShotTeam %>%
     dplyr::filter(player.name == player_1) %>%
@@ -91,7 +117,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   
   Shot1_tier3 <- ShotPlayer1 %>%
     dplyr::filter(location.y > 44)
-
+  
   ShotPlayer2 <- ShotTeam %>%
     dplyr::filter(player.name == player_2) %>%
     dplyr::filter(type.name == 'Shot') %>%
@@ -105,7 +131,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   
   Shot2_tier3 <- ShotPlayer2 %>%
     dplyr::filter(location.y > 44)
-
+  
   ShotPlayer3 <- ShotTeam %>%
     dplyr::filter(player.name == player_3) %>%
     dplyr::filter(type.name == 'Shot') %>%
@@ -228,8 +254,8 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
                         mode = "lines",
                         line = list(color = "#3f2b56", width = 3), type = 'scatter', showlegend = FALSE) 
   }
-
-    shottraj <- function(data, color){
+  
+  shottraj <- function(data, color){
     
     ShotGoal <- data %>%
       dplyr::filter(shot.outcome.name == 'Goal')
@@ -257,23 +283,23 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
                         ,marker = list(size = ~(shot.statsbomb_xg * 70 + 5), color = '#109618', opacity = 0.6, line = list(color = '#109618'))) %>%
       hide_legend() 
   }
- 
+  
   shotmap1 <- ShotMap(ShotPlayer1, Team, player_1)
   shotmap2 <- ShotMap(ShotPlayer2, Team, player_2)
   shotmap3 <- ShotMap(ShotPlayer3, Team, player_3)
- 
+  
   shot1traj1 <- shottraj(Shot1_tier1, '#ffc000')
   shot2traj1 <- shottraj(Shot1_tier2, '#3f2b56')
   shot3traj1 <- shottraj(Shot1_tier3, '#e50c46')
-
+  
   shot1traj2 <- shottraj(Shot2_tier1, '#ffc000')
   shot2traj2 <- shottraj(Shot2_tier2, '#3f2b56')
   shot3traj2 <- shottraj(Shot2_tier3, '#e50c46')
-
+  
   shot1traj3 <- shottraj(Shot3_tier1, '#ffc000')
   shot2traj3 <- shottraj(Shot3_tier2, '#3f2b56')
   shot3traj3 <- shottraj(Shot3_tier3, '#e50c46')
-
+  
   shotmap1_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shotmap1, file = "shotmap1.html")
   webshot::webshot("shotmap1.html", shotmap1_, zoom = 5)
@@ -285,7 +311,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   shotmap3_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shotmap3, file = "shotmap3.html")
   webshot::webshot("shotmap3.html", shotmap3_, zoom = 5)
-
+  
   shot1traj1_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shot1traj1, file = "shot1traj1.html")
   webshot::webshot("shot1traj1.html", shot1traj1_, zoom = 5)
@@ -297,7 +323,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   shot3traj1_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shot3traj1, file = "shot3traj1.html")
   webshot::webshot("shot3traj1.html", shot3traj1_, zoom = 5)
-
+  
   shot1traj2_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shot1traj2, file = "shot1traj2.html")
   webshot::webshot("shot1traj2.html", shot1traj2_, zoom = 5)
@@ -309,7 +335,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   shot3traj2_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shot3traj2, file = "shot3traj2.html")
   webshot::webshot("shot3traj2.html", shot3traj2_, zoom = 5)
-
+  
   shot1traj3_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shot1traj3, file = "shot1traj3.html")
   webshot::webshot("shot1traj3.html", shot1traj3_, zoom = 5)
@@ -321,8 +347,8 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   shot3traj3_ <- tempfile(pattern = "", fileext = ".png")
   htmlwidgets::saveWidget(shot3traj3, file = "shot3traj3.html")
   webshot::webshot("shot3traj3.html", shot3traj3_, zoom = 5)
- 
-  chemin_image <- paste0('C:/Users/William/Desktop/Logo/', Team, '.png')
+  
+  chemin_image <- paste0('C:/Users/User/OneDrive/Desktop/BestPlayerPPT/Logo/', Team, '.png')
   
   image <- png::readPNG(chemin_image)
   
@@ -337,17 +363,17 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
   new_width = largeur_pouces * multi
   
   new_left = (13.33 - new_width)/2
- 
-  my_ppt <- officer::read_pptx(path = 'C:/Users/William/Desktop/model_gk.pptx') #Open PowerPoint model
-
+  
+  my_ppt <- officer::read_pptx(path = 'C:/Users/User/OneDrive/Desktop/BestPlayerPPT/model_gk.pptx') #Open PowerPoint model
+  
   my_ppt <- officer::add_slide(my_ppt,
                                layout = 'titreprepa',
                                master = 'Thème Office') %>%
-    officer::ph_with(value = paste0('J.', Round, ' - ', Stadium, '   ', D, '/', M, '/', Y, ' - ', Hour, 'h', Minute),
+    officer::ph_with(value = paste0(Stage, ' ', 'J.', Round, ' - ', Stadium, '   ', D, '/', M, '/', Y, ' - ', Hour, 'h', Minute),
                      location = officer::ph_location_label(ph_label = 'Soustitre')) %>%
-  officer::ph_with(value = officer::external_img(src = paste0('C:/Users/William/Desktop/Logo/', Team, '.png')),
-                   location = officer::ph_location(left = new_left, top = 1.85, width = new_width, height = 3.2))
- 
+    officer::ph_with(value = officer::external_img(src = paste0('C:/Users/User/OneDrive/Desktop/BestPlayerPPT/Logo/', Team, '.png')),
+                     location = officer::ph_location(left = new_left, top = 1.85, width = new_width, height = 3.2))
+  
   my_ppt <- officer::add_slide(my_ppt, 
                                layout = 'prepatirs',
                                master = 'Thème Office') %>%
@@ -361,7 +387,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
                      location = officer::ph_location_label(ph_label = 'Espace réservé du texte 4')) %>%
     officer::ph_with(value = officer::external_img(shotmap1_), 
                      location = officer::ph_location_label(ph_label = 'Espace réservé du texte 1')) 
- 
+  
   my_ppt <- officer::add_slide(my_ppt, 
                                layout = 'prepatirs',
                                master = 'Thème Office') %>%
@@ -375,7 +401,7 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
                      location = officer::ph_location_label(ph_label = 'Espace réservé du texte 4')) %>%
     officer::ph_with(value = officer::external_img(shotmap2_), 
                      location = officer::ph_location_label(ph_label = 'Espace réservé du texte 1'))
-
+  
   my_ppt <- officer::add_slide(my_ppt, 
                                layout = 'prepatirs',
                                master = 'Thème Office') %>%
@@ -395,21 +421,4 @@ CreatePPT <- function(Team = 'Argentina', Round = 7, CountryName = 'Internationa
 }
 
 CreatePPT()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
